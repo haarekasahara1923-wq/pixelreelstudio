@@ -51,10 +51,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           throw new Error("No account found with this email.");
         }
 
-        if (!user.isVerified) {
-          throw new Error("email-unverified");
-        }
-
         const isPasswordValid = await bcrypt.compare(passwordStr, user.password);
 
         if (!isPasswordValid) {

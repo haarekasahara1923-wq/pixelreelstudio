@@ -28,11 +28,7 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (result?.error) {
-      if (result.error === "email-unverified") {
-        setError("Please verify your email before logging in.");
-      } else {
-        setError(result.error || "Invalid credentials. Please try again.");
-      }
+      setError(result.error || "Invalid credentials. Please try again.");
     } else {
       router.push("/dashboard");
       router.refresh();
