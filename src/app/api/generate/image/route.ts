@@ -173,18 +173,8 @@ export async function POST(req: Request) {
     } else {
       const errors: string[] = [];
 
-      // 1. fal.ai
-      if (falKey && falKey !== "mock_fal_key") {
-        try {
-          console.log("[image] Trying fal.ai...");
-          imageUrl = await generateWithFal(prompt, ratio, falKey);
-          usedProvider = "fal.ai";
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.warn("[image] fal.ai failed:", msg);
-          errors.push(`fal.ai: ${msg}`);
-        }
-      }
+      // 1. fal.ai — DISABLED (no credits)
+      // if (falKey && falKey !== "mock_fal_key") { ... }
 
       // 2. HuggingFace
       if (!imageUrl && hfToken) {

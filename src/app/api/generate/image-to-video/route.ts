@@ -185,17 +185,8 @@ export async function POST(req: Request) {
     } else {
       const errors: string[] = [];
 
-      if (falKey && falKey !== "mock_fal_key") {
-        try {
-          console.log("[i2v] Trying fal.ai...");
-          videoUrl = await falI2V(promptText, imageUrl, falKey);
-          usedProvider = "fal.ai";
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.warn("[i2v] fal.ai failed:", msg);
-          errors.push(`fal.ai: ${msg}`);
-        }
-      }
+      // fal.ai — DISABLED (no credits)
+      // if (falKey && falKey !== "mock_fal_key") { ... }
 
       if (!videoUrl && wavespeedKey) {
         try {

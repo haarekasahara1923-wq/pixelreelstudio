@@ -228,18 +228,8 @@ export async function POST(req: Request) {
     } else {
       const errors: string[] = [];
 
-      // 1. Try fal.ai
-      if (falKey && falKey !== "mock_fal_key") {
-        try {
-          console.log("[video] Trying fal.ai...");
-          videoUrl = await generateWithFal(prompt, ratio, falKey);
-          usedProvider = "fal.ai";
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.warn("[video] fal.ai failed:", msg);
-          errors.push(`fal.ai: ${msg}`);
-        }
-      }
+      // 1. fal.ai — DISABLED (no credits)
+      // if (falKey && falKey !== "mock_fal_key") { ... }
 
       // 2. Try Wavespeed
       if (!videoUrl && wavespeedKey) {
