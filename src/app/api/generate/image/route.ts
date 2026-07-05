@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { users, generations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const MOCK_IMAGES = [
   "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?q=80&w=1024&auto=format&fit=crop",
@@ -20,40 +20,86 @@ function sleep(ms: number) {
 // Provider 1: fal.ai — DISABLED (no credits)
 
 // ─────────────────────────────────────────────
-// Provider 2: HuggingFace (FLUX.1-schnell — free tier)
+// Provider 2: HuggingFace (SDXL — reliable free tier)
 // ─────────────────────────────────────────────
 async function generateWithHuggingFace(
   prompt: string,
   ratio: string,
   hfToken: string
 ): Promise<string> {
-  const width = ratio === "16:9" ? 1024 : ratio === "9:16" ? 576 : 1024;
-  const height = ratio === "16:9" ? 576 : ratio === "9:16" ? 1024 : 1024;
+  // Use 512x512 to stay within HF free tier limits and avoid timeouts
+  const width = ratio === "16:9" ? 768 : ratio === "9:16" ? 512 : 512;
+  const height = ratio === "16:9" ? 432 : ratio === "9:16" ? 768 : 512;
 
-  const res = await fetch(
-    "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${hfToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: { width, height, num_inference_steps: 4 },
-        options: { wait_for_model: true },
-      }),
+  // Try models in order — SDXL is more reliably warm on HF free tier
+  const models = [
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "runwayml/stable-diffusion-v1-5",
+  ];
+
+  for (const model of models) {
+    // Retry up to 3 times for model loading (503 responses)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45_000);
+
+      try {
+        const res = await fetch(
+          `https://api-inference.huggingface.co/models/${model}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${hfToken}`,
+              "Content-Type": "application/json",
+              "X-Wait-For-Model": "true",
+            },
+            body: JSON.stringify({
+              inputs: prompt,
+              parameters: { width, height, num_inference_steps: 20 },
+            }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeoutId);
+
+        // 503 = model still loading, retry after delay
+        if (res.status === 503) {
+          const retryData = await res.json().catch(() => ({})) as { estimated_time?: number };
+          const waitSec = Math.min(retryData?.estimated_time ?? 10, 15);
+          console.log(`[image] HF model ${model} loading, waiting ${waitSec}s (attempt ${attempt + 1})...`);
+          await sleep(waitSec * 1000);
+          continue;
+        }
+
+        if (!res.ok) {
+          const err = await res.text();
+          console.warn(`[image] HF model ${model} failed (${res.status}): ${err}`);
+          break; // try next model
+        }
+
+        // HF returns raw image bytes
+        const contentType = res.headers.get("content-type") || "image/jpeg";
+        if (!contentType.startsWith("image/")) {
+          const errText = await res.text();
+          console.warn(`[image] HF model ${model} returned non-image: ${errText}`);
+          break;
+        }
+
+        const buffer = await res.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+        return `data:${contentType};base64,${base64}`;
+      } catch (e) {
+        clearTimeout(timeoutId);
+        if ((e as Error)?.name === "AbortError") {
+          console.warn(`[image] HF model ${model} timed out (attempt ${attempt + 1})`);
+          break; // try next model
+        }
+        throw e;
+      }
     }
-  );
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`HuggingFace image failed (${res.status}): ${err}`);
   }
-  // HF returns raw image bytes — convert to base64 data URL
-  const buffer = await res.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
-  const contentType = res.headers.get("content-type") || "image/jpeg";
-  return `data:${contentType};base64,${base64}`;
+
+  throw new Error("HuggingFace: all models failed or timed out");
 }
 
 // ─────────────────────────────────────────────
