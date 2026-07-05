@@ -17,30 +17,7 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function ratioToFalSize(ratio: string): string {
-  if (ratio === "16:9") return "landscape_16_9";
-  if (ratio === "9:16") return "portrait_16_9";
-  return "square_hd";
-}
-
-// ─────────────────────────────────────────────
-// Provider 1: fal.ai (FLUX Schnell — fastest)
-// ─────────────────────────────────────────────
-async function generateWithFal(prompt: string, ratio: string, falKey: string): Promise<string> {
-  const res = await fetch("https://fal.run/fal-ai/flux/schnell", {
-    method: "POST",
-    headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, image_size: ratioToFalSize(ratio) }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`fal.ai image failed (${res.status}): ${err}`);
-  }
-  const data = await res.json();
-  const url = data.images?.[0]?.url;
-  if (!url) throw new Error("fal.ai: no image URL returned");
-  return url;
-}
+// Provider 1: fal.ai — DISABLED (no credits)
 
 // ─────────────────────────────────────────────
 // Provider 2: HuggingFace (FLUX.1-schnell — free tier)

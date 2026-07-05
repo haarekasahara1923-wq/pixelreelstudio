@@ -15,45 +15,7 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// ─────────────────────────────────────────────
-// Provider 1: fal.ai (Kling v1.6 image-to-video)
-// ─────────────────────────────────────────────
-async function falI2V(prompt: string, imageUrl: string, falKey: string): Promise<string> {
-  const submitRes = await fetch(
-    "https://queue.fal.run/fal-ai/kling-video/v1.6/standard/image-to-video",
-    {
-      method: "POST",
-      headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, image_url: imageUrl, duration: "5" }),
-    }
-  );
-  if (!submitRes.ok) {
-    const err = await submitRes.text();
-    throw new Error(`fal.ai i2v submit failed (${submitRes.status}): ${err}`);
-  }
-  const { request_id, status_url, response_url } = await submitRes.json();
-  if (!request_id) throw new Error("fal.ai i2v: no request_id");
-
-  const pollUrl = status_url || `https://queue.fal.run/fal-ai/kling-video/v1.6/standard/image-to-video/requests/${request_id}/status`;
-  const resultUrl = response_url || `https://queue.fal.run/fal-ai/kling-video/v1.6/standard/image-to-video/requests/${request_id}`;
-
-  const start = Date.now();
-  while (Date.now() - start < 50_000) {
-    await sleep(4000);
-    const s = await fetch(pollUrl, { headers: { Authorization: `Key ${falKey}` } });
-    if (!s.ok) continue;
-    const sd = await s.json();
-    if (sd.status === "COMPLETED") {
-      const r = await fetch(resultUrl, { headers: { Authorization: `Key ${falKey}` } });
-      const rd = await r.json();
-      const url = rd.video?.url || rd.video_url || rd.output?.video?.url || "";
-      if (!url) throw new Error("fal.ai i2v: no video URL");
-      return url;
-    }
-    if (sd.status === "FAILED") throw new Error(`fal.ai i2v: failed — ${sd.error || sd.detail}`);
-  }
-  throw new Error("fal.ai i2v: timed out");
-}
+// Provider 1: fal.ai — DISABLED (no credits)
 
 // ─────────────────────────────────────────────
 // Provider 2: Wavespeed (image-to-video via Kling v2)
